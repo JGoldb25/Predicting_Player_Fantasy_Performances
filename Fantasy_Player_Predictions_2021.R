@@ -1,5 +1,8 @@
+#Setup the file
 setwd("~/Desktop/")
 rm(list=ls())
+
+#Load relevant packages for data analysis
 library(dplyr)
 library(ggplot2)
 library(devtools)
@@ -7,10 +10,13 @@ library(stringr)
 library(lattice)
 
 #######################
+
+#Load in excel file with Fangraphs Catchers data
 ##Catchers
 Catchers <- read.csv(file = 'FG_Catchers.csv')
 head(Catchers)
 
+#Trim the dataset for columns of interest
 C_specific_cols <- Catchers %>% 
   select(Player = Name, playerid, Team, FG_Average_Draft_Position = ADP, Total_Hits = H, 
          Doubles = X2B, Triples = X3B, Home_Runs = HR, Runs_Batted_In = RBI, 
@@ -18,32 +24,36 @@ C_specific_cols <- Catchers %>%
          Hit_By_Pitch = HBP)
 head(C_specific_cols)
 
+#Update formatting for Catchers Fangraphs rankings
 C_rank_ADP <- C_specific_cols %>%
   mutate(FG_Average_Draft_Position_New = round(FG_Average_Draft_Position, 0)) %>% 
   arrange(FG_Average_Draft_Position_New) %>% 
   relocate(FG_Average_Draft_Position_New, .before = FG_Average_Draft_Position)
 head(C_rank_ADP)
 
+#Remove column
 C_rank_ADP_two <- select(C_rank_ADP, -FG_Average_Draft_Position)
 head(C_rank_ADP_two)
 
+#Iterate over all columns to add row number
 C_rank_ADP_updated_three <- C_rank_ADP_two %>% 
   mutate(FG_Catcher_Rank= row_number()) %>% 
   relocate(FG_Catcher_Rank, .before = FG_Average_Draft_Position_New)
 head(C_rank_ADP_updated_three)
 
-
+#Create new field for total hits
 C_Total_Hits <- C_rank_ADP_updated_three %>% 
   mutate(Singles = Total_Hits - (Doubles + Triples + Home_Runs)) %>% 
   relocate(Singles, .before = Doubles)
 head(C_Total_Hits)
 
-
+#Create new field for total hits
 C_Total_Bases <- C_Total_Hits %>% 
   mutate(Total_Bases = (1 * Singles) + (2 * Doubles) + (3 * Triples) + (4 * Home_Runs)) %>% 
   relocate(Total_Bases, .before = Total_Hits)
 head(C_Total_Bases)
 
+#Modify the point values for each performance metric based on league point settings
 C_strikeouts <- C_Total_Bases %>% 
   mutate(Strikeouts = (-1 * Strikeouts)) %>% 
   relocate(Total_Bases, .before = Stolen_Bases)
@@ -55,7 +65,7 @@ C_cs <- C_strikeouts %>%
   relocate(Total_Bases, .before = Total_Hits)
 head(C_cs)
 
-
+#Create new field for league projected points
 C_proj_points <- C_cs %>% 
   mutate(Proj_Points = (Runs_Scored + Total_Bases + Runs_Batted_In + Walks + Strikeouts + 
                         Hit_By_Pitch + Stolen_Bases + Caught_Stealing)) %>% 
@@ -63,18 +73,18 @@ C_proj_points <- C_cs %>%
   arrange(desc(Proj_Points))
 head(C_proj_points)
 
-
+#Iterate over rows to add row number
 C_league_ranks <- C_proj_points %>% 
   mutate(League_Proj_Points_Rank = row_number()) %>% 
   relocate(League_Proj_Points_Rank, .before = FG_Average_Draft_Position_New)
 head(C_league_ranks)
 
-
+#Add new column for league rank comparison to Fangraphs' rank
 C_league_rank_comp <- C_league_ranks %>% 
   mutate(League_Rank_Comparison_to_FG = FG_Catcher_Rank - League_Proj_Points_Rank) %>% 
   relocate(League_Rank_Comparison_to_FG, .before = FG_Average_Draft_Position_New)
 
-
+#Update formatting on league comparison rank field
 C_league_rank_comp$League_Rank_Comparison_to_FG <- lapply(C_league_rank_comp$League_Rank_Comparison_to_FG, function(x) {
   x.c <- paste0(ifelse(x >= 0, "+", ""), x, "")
 })
@@ -83,37 +93,40 @@ head(C_league_rank_comp)
 C_league_rank_comp$Team <- sub("^$", "Free_Agent", C_league_rank_comp$Team)
 head(C_league_rank_comp)
 
+#Add new field for catcher position
 C_league_rank_total <- C_league_rank_comp %>% 
   mutate(Player_Position = "C") %>% 
   relocate(Player_Position, .before = FG_Catcher_Rank)
 
+#Update field and formatting for players' team
 C_league_rank_comp <- C_league_rank_total %>% 
   mutate(Team_Player = paste0(Team, " - ", C_league_rank_total$Player_Position, " - ", Player)) %>% 
   relocate(Team_Player, .before = Player)
 head(C_league_rank_comp)
 
+#Create mini dataset of top ranked catchers for data visualization
 C_league_ranks_top <- C_league_rank_comp %>% 
   filter(League_Proj_Points_Rank > 0 & League_Proj_Points_Rank < 50 & Team != "Free_Agent") %>% 
   arrange(desc(Proj_Points))
 head(C_league_ranks_top)
 
-
+#View selected fields of interest
 C_points_comp <- C_league_rank_comp %>% 
   select(Team_Player, Proj_Points)
 
-
+#Create dotchart distribution of projected player league points
 dotchart(C_league_ranks_top$Proj_Points, labels = C_league_ranks_top$Team_Player,
          cex=.8,
          main="Catcher Projected Points",
          xlab="Projected Points")
 
 
+#Remove environment variables to repeat analysis for other positions
 ##Dataset: C_points_comp
 rm(C_league_rank_comp)
 rm(C_specific_cols)
 rm(Catchers)
 rm(C_cs)
-##rm(C_league_rank_comp)
 rm(C_league_rank_total)
 rm(C_league_ranks)
 rm(C_league_ranks_top)
@@ -127,6 +140,7 @@ rm(C_Total_Hits)
 #################
 
 
+###Repeat same steps for analysis as for Catchers with modification for new position
 ##First Base
 First_Base <- read.csv(file = 'FG_First_Base.csv')
 head(First_Base)
@@ -249,7 +263,7 @@ rm(FB_Total_Bases)
 rm(FB_Total_Hits)
 #################
 
-
+###Repeat same steps for analysis as for Catchers with modification for new position
 ##Second Base
 Second_Base <- read.csv(file = 'FG_Second_Base.csv')
 head(Second_Base)
@@ -502,6 +516,7 @@ rm(TB_Total_Hits)
 
 ###################
 
+###Repeat same steps for analysis as for Catchers with modification for new position
 ##Short Stop
 Shortstop <- read.csv(file = 'FG_Short_Stop.csv')
 head(Shortstop)
@@ -626,6 +641,7 @@ rm(SS_Total_Hits)
 
 
 ###########
+###Repeat same steps for analysis as for Catchers with modification for new position
 ##Outfield
 Outfield <- read.csv(file = 'FG_Outfield.csv')
 head(Outfield)
@@ -751,6 +767,7 @@ rm(OF_Total_Hits)
 
 ####################
 
+###Repeat same steps for analysis as for Catchers with modification for new position, and updated point values for Pitchers
 ##Pitchers
 Pitchers_One <- read.csv(file = 'FG_Pitchers_One.csv')
 Pitchers_Two <- read.csv(file = 'FG_Pitchers_Two.csv')
@@ -881,6 +898,7 @@ P_RP <- P_league_ranks_top %>%
   filter(Saves >= 20 & League_Proj_Points_Rank > 0 & League_Proj_Points_Rank < 200)
 
 
+#Graph output of projected points based on Starting Pitchers vs. Relief Pitchers, where their sub-position is determined based on number of projected saves
 dotchart(P_SP$Proj_Points, labels = P_SP$Team_Player,
          cex=.8,
          main="Starting Pitcher Projected Points",
@@ -920,44 +938,24 @@ rm(Pitchers_Two)
 
 
 #####All Players Rankings
+#Merge projected point outputs for all positions into one dataset
 All_Players <- do.call("rbind", list(C_points_comp, FB_points_comp, SB_points_comp, TB_points_comp,
                                      SS_points_comp, OF_points_comp, P_points_comp))
 
 
+#Filter out Free Agent players from analysis so as to avoid them showing up in ranking outputs
 All_Players <- All_Players %>% 
   filter(Team_Player != "Free_Agent") %>% 
   arrange(desc(Proj_Points))
     
-  
+#View subset of full projected rankings for data visualization purposes  
 All_Players <- All_Players %>% 
     mutate(Proj_Points_Rank = row_number()) %>% 
     filter(Proj_Points_Rank > 0 & Proj_Points_Rank < 50)
   
 
+#Data visualization output of all player projected points for our 2021 ESPN Fantasy Baseball League
 dotchart(All_Players$Proj_Points, labels = All_Players$Team_Player,
              cex = 0.8,
              main = "All Players Projected 2021 Points - ESPN ATML League",
              xlab = "Projected Points")
-
-
-
-
-
-
-
-
-
-
-#######Testing examples###########
-league_ranks_top$Player = str_wrap(league_ranks_top$Player, width = 3)
-
-ggplot(league_ranks_top, aes(x = reorder(Player, -Proj_Points), y = Proj_Points)) +
-  geom_bar(stat = "identity")
-
-ggplot(league_ranks_top, aes(x = Player, y = Proj_Points)) +
-  geom_dotplot(binaxis = "y", stackdir = "center")
-
-
-
-
-
